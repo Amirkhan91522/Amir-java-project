@@ -1,11 +1,11 @@
+import java.sql.*;
 import java.util.Scanner;
-import java.util.Vector;
 
 class Vector1 {
     public static void main(String[] args) {
         char r;
         Scanner obj1 = new Scanner(System.in);
-        Library library = new Library(); 
+        Library library = new Library();
 
         do {
             System.out.println("Library Management System");
@@ -21,13 +21,13 @@ class Vector1 {
 
             switch (a) {
                 case 1:
-                    library.add(obj1); 
+                    library.add(obj1);
                     break;
                 case 2:
                     library.iss(obj1);
                     break;
                 case 3:
-                    library.ret(obj1); 
+                    library.ret(obj1);
                     break;
                 case 4:
                     library.detail();
@@ -49,112 +49,140 @@ class Vector1 {
     }
 }
 
-class Book {
-    String name;
-    float price;
-    int id;
-
-    Book(String name, float price, int id) {
-        this.name = name;
-        this.price = price;
-        this.id = id;
-    }
-}
-
-class IssueDetails {
-    String bookName;
-    int bookID;
-    String issueDate;
-    String returnDate;
-
-    IssueDetails(String bookName, int bookID, String issueDate, String returnDate) {
-        this.bookName = bookName;
-        this.bookID = bookID;
-        this.issueDate = issueDate;
-        this.returnDate = returnDate;
-    }
-}
-
 class Library {
-    Vector<Book> books = new Vector<>();
-    Vector<IssueDetails> issuedBooks = new Vector<>(); // Stores issued books details
+    Connection con;
+
+    public Library() {
+        try {
+            // Establish database connection
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/library_db", "root", "");
+            System.out.println("Database connected successfully.");
+        } catch (SQLException e) {
+            System.out.println("Database connection failed: " + e.getMessage());
+        }
+    }
 
     void add(Scanner obj1) {
-        System.out.println("How many books do you want to add?");
-        int numberOfBooks = obj1.nextInt();
-        obj1.nextLine();
-
-        for (int i = 0; i < numberOfBooks; i++) {
-            System.out.println("Enter details for Book " + (books.size() + 1));
-            System.out.println("Enter Book Name:");
-            String name = obj1.nextLine();
-            System.out.println("Enter Book Price:");
-            float price = obj1.nextFloat();
-            System.out.println("Enter Book ID:");
-            int id = obj1.nextInt();
+        try {
+            System.out.println("How many books do you want to add?");
+            int numberOfBooks = obj1.nextInt();
             obj1.nextLine();
 
-            books.add(new Book(name, price, id));
-            System.out.println("Book added: " + name + ", Price: " + price + ", Book No: " + id);
+            for (int i = 0; i < numberOfBooks; i++) {
+                System.out.println("Enter details for Book " + (i + 1));
+                System.out.println("Enter Book Name:");
+                String name = obj1.nextLine();
+                System.out.println("Enter Book Price:");
+                float price = obj1.nextFloat();
+                System.out.println("Enter Book ID:");
+                int id = obj1.nextInt();
+                obj1.nextLine();
+
+                // Insert book into the database
+                String query = "INSERT INTO books (id, name, price) VALUES (?, ?, ?)";
+                PreparedStatement pst = con.prepareStatement(query);
+                pst.setInt(1, id);
+                pst.setString(2, name);
+                pst.setFloat(3, price);
+                pst.executeUpdate();
+
+                System.out.println("Book added: " + name + ", Price: " + price + ", Book No: " + id);
+            }
+        } catch (SQLException e) {
+            System.out.println("Error adding book: " + e.getMessage());
         }
     }
 
     void iss(Scanner obj1) {
-        System.out.println("Book Name:");
-        String issueBookName = obj1.nextLine();
-        System.out.println("Book ID:");
-        int issueBookID = obj1.nextInt();
-        obj1.nextLine();  
-        System.out.println("Issue date:");
-        String issueDate = obj1.nextLine();
-        System.out.println("Return book date:");
-        String returnDate = obj1.nextLine();
+        try {
+            System.out.println("Book Name:");
+            String issueBookName = obj1.nextLine();
+            System.out.println("Book ID:");
+            int issueBookID = obj1.nextInt();
+            obj1.nextLine();
+            System.out.println("Issue date (YYYY-MM-DD):");
+            String issueDate = obj1.nextLine();
+            System.out.println("Return date (YYYY-MM-DD):");
+            String returnDate = obj1.nextLine();
 
-        // Add the issued book details to the issuedBooks list
-        issuedBooks.add(new IssueDetails(issueBookName, issueBookID, issueDate, returnDate));
-        System.out.println("Book issued: " + issueBookName + ", Book ID: " + issueBookID);
+            // Insert issue details into the database
+            String query = "INSERT INTO issued_books (book_id, book_name, issue_date, return_date) VALUES (?, ?, ?, ?)";
+            PreparedStatement pst = con.prepareStatement(query);
+            pst.setInt(1, issueBookID);
+            pst.setString(2, issueBookName);
+            pst.setDate(3, Date.valueOf(issueDate));
+            pst.setDate(4, Date.valueOf(returnDate));
+            pst.executeUpdate();
+
+            System.out.println("Book issued: " + issueBookName + ", Book ID: " + issueBookID);
+        } catch (SQLException e) {
+            System.out.println("Error issuing book: " + e.getMessage());
+        }
     }
 
     void ret(Scanner obj1) {
-        System.out.println("Enter Book ID to return:");
-        int bookID = obj1.nextInt();
-        obj1.nextLine(); // Consume the newline character
-        
-        boolean found = false;
+        try {
+            System.out.println("Enter Book ID to return:");
+            int bookID = obj1.nextInt();
+            obj1.nextLine();
 
-        // Search for the issued book by ID
-        for (IssueDetails issue : issuedBooks) {
-            if (issue.bookID == bookID) {
+            String query = "SELECT * FROM issued_books WHERE book_id = ?";
+            PreparedStatement pst = con.prepareStatement(query);
+            pst.setInt(1, bookID);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
                 System.out.println("Book Details:");
-                System.out.println("Book Name: " + issue.bookName);
-                System.out.println("Book ID: " + issue.bookID);
-                System.out.println("Issue Date: " + issue.issueDate);
-                System.out.println("Return Date: " + issue.returnDate);
-                found = true;
-                break;
-            }
-        }
+                System.out.println("Book Name: " + rs.getString("book_name"));
+                System.out.println("Book ID: " + rs.getInt("book_id"));
+                System.out.println("Issue Date: " + rs.getDate("issue_date"));
+                System.out.println("Return Date: " + rs.getDate("return_date"));
 
-        if (!found) {
-            System.out.println("No book found with the entered ID.");
+                // Delete book from issued_books
+                String deleteQuery = "DELETE FROM issued_books WHERE book_id = ?";
+                PreparedStatement deletePst = con.prepareStatement(deleteQuery);
+                deletePst.setInt(1, bookID);
+                deletePst.executeUpdate();
+
+                System.out.println("Book returned successfully.");
+            } else {
+                System.out.println("No book found with the entered ID.");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error returning book: " + e.getMessage());
         }
     }
 
     void detail() {
-        if (issuedBooks.isEmpty()) {
-            System.out.println("No books have been issued.");
-        } else {
-            System.out.println("Issued Books Details:");
-            for (IssueDetails issue : issuedBooks) {
-                System.out.println("Book Name: " + issue.bookName);
-                System.out.println("Book ID: " + issue.bookID);
-                System.out.println("Issue Date: " + issue.issueDate);
-                System.out.println("Return Date: " + issue.returnDate);
+        try {
+            String query = "SELECT * FROM issued_books";
+            PreparedStatement pst = con.prepareStatement(query);
+            ResultSet rs = pst.executeQuery();
+
+            if (!rs.isBeforeFirst()) {
+                System.out.println("No books have been issued.");
+            } else {
+                System.out.println("Issued Books Details:");
+                while (rs.next()) {
+                    System.out.println("Book Name: " + rs.getString("book_name"));
+                    System.out.println("Book ID: " + rs.getInt("book_id"));
+                    System.out.println("Issue Date: " + rs.getDate("issue_date"));
+                    System.out.println("Return Date: " + rs.getDate("return_date"));
+                }
             }
+        } catch (SQLException e) {
+            System.out.println("Error fetching issue details: " + e.getMessage());
         }
     }
 
     void exit() {
+        try {
+            if (con != null) {
+                con.close();
+            }
+        } catch (SQLException e) {
+            System.out.println("Error closing database connection: " + e.getMessage());
+        }
         System.out.println("Exiting...");
         System.exit(0);
     }
